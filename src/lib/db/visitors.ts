@@ -1,6 +1,5 @@
-import { kv } from "@vercel/kv";
-
 import type { Purpose, Status, Visitor } from "@/lib/types";
+import { getRedis, hasRedisConfig } from "@/lib/db/redis";
 
 export const MOCK_VISITORS: Visitor[] = [
   {
@@ -47,21 +46,17 @@ const globalStore = globalThis as typeof globalThis & {
   __visitorDb?: Visitor[];
 };
 
-function hasKvConfig(): boolean {
-  return Boolean(
-    process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN,
-  );
-}
-
 async function readStore(): Promise<Visitor[]> {
-  if (hasKvConfig()) {
-    const stored = await kv.get<Visitor[]>(STORAGE_KEY);
+  const redis = getRedis();
+
+  if (redis) {
+    const stored = await redis.get<Visitor[]>(STORAGE_KEY);
     if (stored && Array.isArray(stored)) {
       return stored;
     }
 
     const initial = structuredClone(MOCK_VISITORS);
-    await kv.set(STORAGE_KEY, initial);
+    await redis.set(STORAGE_KEY, initial);
     return initial;
   }
 
@@ -73,8 +68,10 @@ async function readStore(): Promise<Visitor[]> {
 }
 
 async function writeStore(visitors: Visitor[]): Promise<void> {
-  if (hasKvConfig()) {
-    await kv.set(STORAGE_KEY, visitors);
+  const redis = getRedis();
+
+  if (redis) {
+    await redis.set(STORAGE_KEY, visitors);
     return;
   }
 
@@ -154,3 +151,5 @@ export function isValidPurpose(value: unknown): value is Purpose {
 export function isValidStatus(value: unknown): value is Status {
   return value === "未対応" || value === "対応中" || value === "対応済み";
 }
+
+export { hasRedisConfig };
