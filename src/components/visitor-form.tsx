@@ -34,24 +34,38 @@ export function VisitorForm() {
   const [message, setMessage] = useState("");
   const [returnVisitAt, setReturnVisitAt] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const canSubmit = purpose !== null && visitorName.trim().length > 0;
+  const canSubmit =
+    purpose !== null && visitorName.trim().length > 0 && !isSubmitting;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit || purpose === null) return;
 
-    addVisitor({
-      purpose,
-      visitor_name: visitorName.trim(),
-      message: message.trim(),
-      return_visit_scheduled_at: returnVisitAt,
-    });
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    setPurpose(null);
-    setVisitorName("");
-    setMessage("");
-    setReturnVisitAt(null);
-    setShowSuccess(true);
+    try {
+      await addVisitor({
+        purpose,
+        visitor_name: visitorName.trim(),
+        message: message.trim(),
+        return_visit_scheduled_at: returnVisitAt,
+      });
+
+      setPurpose(null);
+      setVisitorName("");
+      setMessage("");
+      setReturnVisitAt(null);
+      setShowSuccess(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "呼出通知の送信に失敗しました",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -80,6 +94,7 @@ export function VisitorForm() {
                   purpose === item && "ring-2 ring-ring ring-offset-2",
                 )}
                 onClick={() => setPurpose(item)}
+                disabled={isSubmitting}
               >
                 {purposeIcons[item]}
                 {item}
@@ -99,6 +114,7 @@ export function VisitorForm() {
               value={visitorName}
               onChange={(e) => setVisitorName(e.target.value)}
               className="h-12 text-base"
+              disabled={isSubmitting}
             />
           </div>
 
@@ -112,6 +128,7 @@ export function VisitorForm() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="min-h-[120px] text-base"
+              disabled={isSubmitting}
             />
           </div>
 
@@ -124,6 +141,10 @@ export function VisitorForm() {
           </div>
         </section>
 
+        {submitError && (
+          <p className="text-sm text-destructive">{submitError}</p>
+        )}
+
         <Button
           type="button"
           size="lg"
@@ -131,7 +152,7 @@ export function VisitorForm() {
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          呼出を通知する
+          {isSubmitting ? "送信中..." : "呼出を通知する"}
         </Button>
       </div>
 

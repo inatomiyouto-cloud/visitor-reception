@@ -42,8 +42,11 @@ import {
 } from "@/lib/visitor-storage";
 
 export function AdminDashboard() {
-  const { visitors, isReady, changeStatus, removeVisitor } = useVisitors();
+  const { visitors, isReady, error, changeStatus, removeVisitor } = useVisitors({
+    playChimeOnInsert: true,
+  });
   const [visitorToDelete, setVisitorToDelete] = useState<Visitor | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const pendingCount = countPending(visitors);
   const totalCount = visitors.length;
@@ -60,10 +63,29 @@ export function AdminDashboard() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!visitorToDelete) return;
-    removeVisitor(visitorToDelete.id);
-    setVisitorToDelete(null);
+
+    try {
+      setActionError(null);
+      await removeVisitor(visitorToDelete.id);
+      setVisitorToDelete(null);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "来客データの削除に失敗しました",
+      );
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: Status) => {
+    try {
+      setActionError(null);
+      await changeStatus(id, status);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "ステータスの更新に失敗しました",
+      );
+    }
   };
 
   return (
@@ -74,9 +96,13 @@ export function AdminDashboard() {
             管理者ダッシュボード
           </h1>
           <p className="text-sm text-muted-foreground">
-            来客履歴の確認と対応管理
+            来客履歴の確認と対応管理（リアルタイム同期）
           </p>
         </header>
+
+        {(error || actionError) && (
+          <p className="mb-4 text-sm text-destructive">{error ?? actionError}</p>
+        )}
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
@@ -173,7 +199,7 @@ export function AdminDashboard() {
                         <Select
                           value={visitor.status}
                           onValueChange={(value: Status) =>
-                            changeStatus(visitor.id, value)
+                            handleStatusChange(visitor.id, value)
                           }
                         >
                           <SelectTrigger className="w-[120px]">
