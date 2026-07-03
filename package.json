@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:external": "next dev --hostname 0.0.0.0 --port 3000",
+    "tunnel": "npx cloudflared tunnel --url http://localhost:3000",
     "build": "next build",
     "start": "next start",
+    "start:external": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "next lint"
   },
   "dependencies": {
