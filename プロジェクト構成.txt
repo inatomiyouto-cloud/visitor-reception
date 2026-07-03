@@ -1,0 +1,14 @@
+visitor-reception/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx              # トップ（各画面へのリンク）
+│   │   ├── visitor/page.tsx      # 訪問者画面
+│   │   └── admin/dashboard/page.tsx  # 管理者画面
+│   ├── components/
+│   │   ├── visitor-form.tsx      # 訪問者フォーム
+│   │   ├── admin-dashboard.tsx   # 管理者ダッシュボード
+│   │   └── ui/                   # shadcn/ui コンポーネント
+│   ├── hooks/use-visitors.ts     # LocalStorage + useState
+│   └── lib/
+│       ├── types.ts              # 型定義
+│       └── visitor-storage.ts    # モックデータ・永続化
