@@ -8,7 +8,8 @@ import {
 import { sendLineVisitorNotification } from "@/lib/line";
 
 export async function GET() {
-  return NextResponse.json({ visitors: listVisitors() });
+  const visitors = await listVisitors();
+  return NextResponse.json({ visitors });
 }
 
 export async function POST(request: Request) {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
           ? null
           : null;
 
-    const visitor = insertVisitor({
+    const visitor = await insertVisitor({
       purpose: body.purpose,
       visitor_name: body.visitor_name.trim(),
       message,

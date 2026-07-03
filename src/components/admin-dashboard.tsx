@@ -44,6 +44,7 @@ import {
 export function AdminDashboard() {
   const { visitors, isReady, error, changeStatus, removeVisitor } = useVisitors({
     playChimeOnInsert: true,
+    enablePolling: true,
   });
   const [visitorToDelete, setVisitorToDelete] = useState<Visitor | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);

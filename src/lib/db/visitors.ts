@@ -1,3 +1,5 @@
+import { kv } from "@vercel/kv";
+
 import type { Purpose, Status, Visitor } from "@/lib/types";
 
 export const MOCK_VISITORS: Visitor[] = [
@@ -39,34 +41,69 @@ export const MOCK_VISITORS: Visitor[] = [
   },
 ];
 
+const STORAGE_KEY = "visitor-reception:visitors";
+
 const globalStore = globalThis as typeof globalThis & {
   __visitorDb?: Visitor[];
 };
 
-function getStore(): Visitor[] {
+function hasKvConfig(): boolean {
+  return Boolean(
+    process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN,
+  );
+}
+
+async function readStore(): Promise<Visitor[]> {
+  if (hasKvConfig()) {
+    const stored = await kv.get<Visitor[]>(STORAGE_KEY);
+    if (stored && Array.isArray(stored)) {
+      return stored;
+    }
+
+    const initial = structuredClone(MOCK_VISITORS);
+    await kv.set(STORAGE_KEY, initial);
+    return initial;
+  }
+
   if (!globalStore.__visitorDb) {
     globalStore.__visitorDb = structuredClone(MOCK_VISITORS);
   }
+
   return globalStore.__visitorDb;
 }
 
-export function listVisitors(): Visitor[] {
-  return [...getStore()].sort(
+async function writeStore(visitors: Visitor[]): Promise<void> {
+  if (hasKvConfig()) {
+    await kv.set(STORAGE_KEY, visitors);
+    return;
+  }
+
+  globalStore.__visitorDb = visitors;
+}
+
+function sortVisitors(visitors: Visitor[]): Visitor[] {
+  return [...visitors].sort(
     (a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 }
 
-export function findVisitor(id: string): Visitor | undefined {
-  return getStore().find((visitor) => visitor.id === id);
+export async function listVisitors(): Promise<Visitor[]> {
+  return sortVisitors(await readStore());
 }
 
-export function insertVisitor(
+export async function findVisitor(id: string): Promise<Visitor | undefined> {
+  const store = await readStore();
+  return store.find((visitor) => visitor.id === id);
+}
+
+export async function insertVisitor(
   data: Pick<
     Visitor,
     "purpose" | "visitor_name" | "message" | "return_visit_scheduled_at"
   >,
-): Visitor {
+): Promise<Visitor> {
+  const store = await readStore();
   const visitor: Visitor = {
     id: crypto.randomUUID(),
     created_at: new Date().toISOString(),
@@ -77,25 +114,31 @@ export function insertVisitor(
     return_visit_scheduled_at: data.return_visit_scheduled_at,
   };
 
-  getStore().unshift(visitor);
+  store.unshift(visitor);
+  await writeStore(store);
   return visitor;
 }
 
-export function patchVisitorStatus(id: string, status: Status): Visitor | null {
-  const store = getStore();
+export async function patchVisitorStatus(
+  id: string,
+  status: Status,
+): Promise<Visitor | null> {
+  const store = await readStore();
   const index = store.findIndex((visitor) => visitor.id === id);
   if (index === -1) return null;
 
   store[index] = { ...store[index], status };
+  await writeStore(store);
   return store[index];
 }
 
-export function removeVisitor(id: string): boolean {
-  const store = getStore();
+export async function removeVisitor(id: string): Promise<boolean> {
+  const store = await readStore();
   const index = store.findIndex((visitor) => visitor.id === id);
   if (index === -1) return false;
 
   store.splice(index, 1);
+  await writeStore(store);
   return true;
 }
 
