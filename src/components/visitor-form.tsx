@@ -16,9 +16,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useVisitors } from "@/hooks/use-visitors";
+import { broadcastRealtimeEvent } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
-import { PURPOSES, type Purpose } from "@/lib/types";
+import { PURPOSES, type Purpose, type Visitor } from "@/lib/types";
 
 const purposeIcons: Record<Purpose, ReactNode> = {
   配達: <Package className="h-6 w-6" />,
@@ -27,8 +27,30 @@ const purposeIcons: Record<Purpose, ReactNode> = {
   その他: <HelpCircle className="h-6 w-6" />,
 };
 
+async function submitVisitor(
+  data: Pick<
+    Visitor,
+    "purpose" | "visitor_name" | "message" | "return_visit_scheduled_at"
+  >,
+): Promise<Visitor> {
+  const response = await fetch("/api/visitors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(body?.error ?? "呼出通知の送信に失敗しました");
+  }
+
+  const result = (await response.json()) as { visitor: Visitor };
+  return result.visitor;
+}
+
 export function VisitorForm() {
-  const { addVisitor } = useVisitors();
   const [purpose, setPurpose] = useState<Purpose | null>(null);
   const [visitorName, setVisitorName] = useState("");
   const [message, setMessage] = useState("");
@@ -47,12 +69,14 @@ export function VisitorForm() {
     setSubmitError(null);
 
     try {
-      await addVisitor({
+      const visitor = await submitVisitor({
         purpose,
         visitor_name: visitorName.trim(),
         message: message.trim(),
         return_visit_scheduled_at: returnVisitAt,
       });
+
+      broadcastRealtimeEvent({ type: "INSERT", visitor });
 
       setPurpose(null);
       setVisitorName("");
