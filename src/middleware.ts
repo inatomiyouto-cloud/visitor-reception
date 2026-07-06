@@ -6,13 +6,19 @@ import {
   isAdminAuthenticated,
 } from "@/lib/admin-auth";
 
+function isProtectedAdminPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/admin/dashboard") || pathname.startsWith("/admin/qr")
+  );
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const authenticated = isAdminAuthenticated(
     request.cookies.get(ADMIN_AUTH_COOKIE)?.value,
   );
 
-  if (pathname.startsWith("/admin/dashboard")) {
+  if (isProtectedAdminPath(pathname)) {
     if (!authenticated) {
       const loginUrl = new URL("/admin/login", request.url);
       loginUrl.searchParams.set("from", pathname);
@@ -37,5 +43,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin", "/admin/login", "/admin/dashboard/:path*"],
+  matcher: ["/admin", "/admin/login", "/admin/dashboard/:path*", "/admin/qr"],
 };

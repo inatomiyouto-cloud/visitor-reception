@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Users, AlertCircle, Clock, Trash2 } from "lucide-react";
+import { Users, AlertCircle, Clock, Trash2, QrCode } from "lucide-react";
 
 import {
   AlertDialog,
@@ -92,13 +93,21 @@ export function AdminDashboard() {
   return (
     <>
       <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">
-            管理者ダッシュボード
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            来客履歴の確認と対応管理（リアルタイム同期）
-          </p>
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              管理者ダッシュボード
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              来客履歴の確認と対応管理（リアルタイム同期）
+            </p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/admin/qr">
+              <QrCode className="mr-2 h-4 w-4" />
+              訪問者用QRコード
+            </Link>
+          </Button>
         </header>
 
         {(error || actionError) && (
