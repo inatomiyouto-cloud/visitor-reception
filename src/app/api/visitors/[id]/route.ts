@@ -20,7 +20,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ステータスが不正です" }, { status: 400 });
     }
 
-    const visitor = patchVisitorStatus(id, body.status);
+    const visitor = await patchVisitorStatus(id, body.status);
     if (!visitor) {
       return NextResponse.json({ error: "来客が見つかりません" }, { status: 404 });
     }
@@ -39,11 +39,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    if (!findVisitor(id)) {
+    if (!(await findVisitor(id))) {
       return NextResponse.json({ error: "来客が見つかりません" }, { status: 404 });
     }
 
-    removeVisitor(id);
+    await removeVisitor(id);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("[API] DELETE /api/visitors/[id] failed:", error);

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Status, Visitor } from "@/lib/types";
 import { playNotificationChime } from "@/lib/chime";
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from "@/lib/realtime";
 
 interface UseVisitorsOptions {
   playChimeOnInsert?: boolean;
+  enablePolling?: boolean;
 }
 
 async function fetchVisitors(): Promise<Visitor[]> {
@@ -20,17 +21,39 @@ async function fetchVisitors(): Promise<Visitor[]> {
 }
 
 export function useVisitors(options: UseVisitorsOptions = {}) {
-  const { playChimeOnInsert = false } = options;
+  const { playChimeOnInsert = false, enablePolling = false } = options;
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const isReadyRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    const data = await fetchVisitors();
-    setVisitors(data);
-    setError(null);
-    return data;
-  }, []);
+  const refresh = useCallback(
+    async (opts?: { detectNew?: boolean }) => {
+      const data = await fetchVisitors();
+
+      if (
+        opts?.detectNew &&
+        playChimeOnInsert &&
+        isReadyRef.current &&
+        knownIdsRef.current.size > 0
+      ) {
+        const hasNewVisitor = data.some(
+          (visitor) => !knownIdsRef.current.has(visitor.id),
+        );
+
+        if (hasNewVisitor) {
+          playNotificationChime();
+        }
+      }
+
+      knownIdsRef.current = new Set(data.map((visitor) => visitor.id));
+      setVisitors(data);
+      setError(null);
+      return data;
+    },
+    [playChimeOnInsert],
+  );
 
   useEffect(() => {
     refresh()
@@ -39,8 +62,23 @@ export function useVisitors(options: UseVisitorsOptions = {}) {
           err instanceof Error ? err.message : "来客データの取得に失敗しました",
         );
       })
-      .finally(() => setIsReady(true));
+      .finally(() => {
+        isReadyRef.current = true;
+        setIsReady(true);
+      });
   }, [refresh]);
+
+  useEffect(() => {
+    if (!enablePolling || !isReady) return;
+
+    const intervalId = window.setInterval(() => {
+      refresh({ detectNew: true }).catch(() => {
+        // ポーリング失敗は次回に任せる
+      });
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [enablePolling, isReady, refresh]);
 
   useEffect(() => {
     return subscribeRealtimeEvents((event) => {
@@ -49,6 +87,8 @@ export function useVisitors(options: UseVisitorsOptions = {}) {
           if (prev.some((visitor) => visitor.id === event.visitor.id)) {
             return prev;
           }
+
+          knownIdsRef.current.add(event.visitor.id);
 
           if (playChimeOnInsert) {
             playNotificationChime();
@@ -68,6 +108,7 @@ export function useVisitors(options: UseVisitorsOptions = {}) {
         return;
       }
 
+      knownIdsRef.current.delete(event.id);
       setVisitors((prev) => prev.filter((visitor) => visitor.id !== event.id));
     });
   }, [playChimeOnInsert]);
@@ -93,6 +134,7 @@ export function useVisitors(options: UseVisitorsOptions = {}) {
       }
 
       const result = (await response.json()) as { visitor: Visitor };
+      knownIdsRef.current.add(result.visitor.id);
       broadcastRealtimeEvent({ type: "INSERT", visitor: result.visitor });
       return result.visitor;
     },
@@ -129,6 +171,7 @@ export function useVisitors(options: UseVisitorsOptions = {}) {
       throw new Error("来客データの削除に失敗しました");
     }
 
+    knownIdsRef.current.delete(id);
     setVisitors((prev) => prev.filter((visitor) => visitor.id !== id));
     broadcastRealtimeEvent({ type: "DELETE", id });
   }, []);
